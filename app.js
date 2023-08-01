@@ -2,7 +2,8 @@ require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const md5 =  require("md5");
+const bcrypt = require("bcrypt");
+const saltrounds = 10;
 
 mongoose.connect("mongodb://127.0.0.1:27017/UsersDB");
 
@@ -30,18 +31,21 @@ app.get("/register", function(req, res){
 
 app.post("/register", function(req, res){
     const userName = req.body.username;
-    const pass = md5(req.body.password);
 
-    const newUser = {
-        email: userName,
-        password: pass
-    };
-
-    User.create(newUser).then(function(){
-        res.render("secrets", {});
-    }).catch(function(err){
-        res.send(err);
+    bcrypt.hash(req.body.password, saltrounds, function(err, hash){
+        const pass = hash;
+        const newUser = {
+            email: userName,
+            password: pass
+        };
+    
+        User.create(newUser).then(function(){
+            res.render("secrets", {});
+        }).catch(function(err){
+            res.send(err);
+        });
     });
+    
 });
 
 app.get("/login", function(req, res){
@@ -50,14 +54,17 @@ app.get("/login", function(req, res){
 
 app.post("/login", function(req, res){
     const userName = req.body.username;
-    const pass = md5(req.body.password);
+    const pass = req.body.password;
     
     User.findOne({email: userName}).then(function(foundUser){
         if(foundUser){
-            if(pass===foundUser.password)
-                res.render("secrets", {});
-            else
-                console.log("Wrong Credentials!");
+            bcrypt.compare(pass, foundUser.password, function(err, result){
+                if(result==true)
+                    res.render("secrets", {});
+                else
+                    console.log("Wrong Credentials!");
+            });
+    
         }
         else
             res.send("User Not Found! Click on Register to get Signed Up.");
